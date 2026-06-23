@@ -2,6 +2,8 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\TaskController;
 
 Route::get('/', function () {
     return view('login');
@@ -11,6 +13,10 @@ Route::get('/auth/google', [AuthController::class, 'redirectToGoogle'])->middlew
 Route::get('/auth/google/callback', [AuthController::class, 'handleGoogleCallback'])->middleware('guest');
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
-Route::get('/dashboard', function () {
-    return view('dashboard');
-})->middleware('auth')->name('dashboard');
+Route::get('/dashboard', [DashboardController::class, 'index'])->middleware('auth')->name('dashboard');
+
+Route::get('/tugas', [TaskController::class, 'index'])->middleware('auth')->name('tugas');
+
+Route::get('/activity-history', function () {
+    return view('activities');
+})->middleware('auth')->name('activity.history');

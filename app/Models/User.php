@@ -40,4 +40,15 @@ class User extends Authenticatable
         return [
         ];
     }
+
+    public function profile()
+    {
+        return $this->hasOne(UserProfile::class);
+    }
+
+    public function assignedTasks()
+    {
+        return $this->belongsToMany(Task::class, 'task_assignees', 'user_id', 'task_id')
+                    ->withPivot('assigned_at');
+    }
 }
