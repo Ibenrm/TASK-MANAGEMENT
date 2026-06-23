@@ -16,7 +16,8 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 Route::get('/dashboard', [DashboardController::class, 'index'])->middleware('auth')->name('dashboard');
 
 Route::get('/tugas', [TaskController::class, 'index'])->middleware('auth')->name('tugas');
-
+Route::post('/tugas', [TaskController::class, 'store'])->middleware('auth')->name('tasks.store');
+Route::put('/tugas/{task}', [TaskController::class, 'update'])->middleware('auth')->name('tasks.update');
 Route::get('/activity-history', function () {
     return view('activities');
 })->middleware('auth')->name('activity.history');
