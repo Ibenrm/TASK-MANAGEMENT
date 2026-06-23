@@ -18,6 +18,7 @@ Route::get('/dashboard', [DashboardController::class, 'index'])->middleware('aut
 Route::get('/tugas', [TaskController::class, 'index'])->middleware('auth')->name('tugas');
 Route::post('/tugas', [TaskController::class, 'store'])->middleware('auth')->name('tasks.store');
 Route::put('/tugas/{task}', [TaskController::class, 'update'])->middleware('auth')->name('tasks.update');
+Route::post('/tugas/reorder', [TaskController::class, 'reorder'])->middleware('auth')->name('tasks.reorder');
 Route::get('/activity-history', function () {
     return view('activities');
 })->middleware('auth')->name('activity.history');

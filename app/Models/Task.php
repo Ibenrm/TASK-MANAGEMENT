@@ -13,7 +13,8 @@ class Task extends Model
         'priority_id',
         'start_date',
         'deadline_date',
-        'position',
+        'previous_task_id',
+        'next_task_id',
     ];
 
     protected function casts(): array
@@ -48,5 +49,15 @@ class Task extends Model
     {
         return $this->belongsToMany(User::class, 'task_assignees', 'task_id', 'user_id')
                     ->withPivot('assigned_at');
+    }
+
+    public function previousTask()
+    {
+        return $this->belongsTo(Task::class, 'previous_task_id');
+    }
+
+    public function nextTask()
+    {
+        return $this->belongsTo(Task::class, 'next_task_id');
     }
 }

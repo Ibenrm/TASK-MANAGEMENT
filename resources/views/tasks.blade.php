@@ -32,6 +32,11 @@
     .badge-urgent { background-color: #ffe4e6; color: #e11d48; }
     .badge-normal { background-color: #e0e7ff; color: #4f46e5; } /* Indigo theme for medium */
     .badge-low { background-color: #d1fae5; color: #059669; }
+    
+    /* Hide empty card if there are tasks in the column */
+    .sortable-list:has(.kanban-card) .empty-card {
+        display: none;
+    }
 </style>
 @endpush
 
@@ -69,16 +74,16 @@
                     <span class="w-2.5 h-2.5 rounded-full" style="{{ $dotColor }}"></span>
                     <span>{{ $status->name }}</span>
                 </h3>
-                <span class="bg-white dark:bg-slate-700 text-xs font-bold px-2.5 py-1 rounded-full shadow-sm border border-gray-200 dark:border-slate-600 text-slate-500 dark:text-slate-300 transition-colors duration-200">
+                <span class="column-task-count bg-white dark:bg-slate-700 text-xs font-bold px-2.5 py-1 rounded-full shadow-sm border border-gray-200 dark:border-slate-600 text-slate-500 dark:text-slate-300 transition-colors duration-200">
                     {{ $status->tasks->count() }}
                 </span>
             </div>
 
             <!-- Task List -->
-            <div class="p-3 flex-1 overflow-y-auto space-y-3">
-                @forelse($status->tasks as $task)
+            <div class="p-3 flex-1 overflow-y-auto space-y-3 sortable-list" data-status-id="{{ $status->id }}">
+                @foreach($status->tasks as $task)
                 <!-- Task Card -->
-                <div @click="showModal = true; $dispatch('modal-opened', { task: {{ $task->toJson() }} })" class="bg-white dark:bg-slate-800 p-3.5 rounded-xl shadow-sm hover:shadow-md cursor-pointer group kanban-card transition-all duration-200 border border-slate-200 dark:border-slate-700 relative flex flex-col gap-3">
+                <div data-id="{{ $task->id }}" data-task="{{ $task->toJson() }}" @click="showModal = true; $dispatch('modal-opened', { task: JSON.parse($el.dataset.task) })" class="bg-white dark:bg-slate-800 p-3.5 rounded-xl shadow-sm hover:shadow-md cursor-pointer group kanban-card transition-all duration-200 border border-slate-200 dark:border-slate-700 relative flex flex-col gap-3">
                     
                     <!-- Top Row: Badges & Options -->
                     <div class="flex justify-between items-start">
@@ -96,7 +101,7 @@
                             </span>
                             
                             <!-- Status Badge -->
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-slate-50 text-slate-500 border border-slate-200 dark:bg-slate-700/50 dark:text-slate-400 dark:border-slate-600">
+                            <span class="task-status-badge inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-slate-50 text-slate-500 border border-slate-200 dark:bg-slate-700/50 dark:text-slate-400 dark:border-slate-600">
                                 {{ $status->name }}
                             </span>
                         </div>
@@ -199,11 +204,11 @@
                         </div>
                     </div>
                 </div>
-                @empty
+                @endforeach
+
                 <div class="empty-card text-center p-6 text-sm text-gray-400 border-2 border-dashed border-gray-200 rounded-lg bg-gray-50/50 transition-colors duration-200">
                     Tidak ada tugas
                 </div>
-                @endforelse
             </div>
         </div>
         @empty
@@ -217,4 +222,83 @@
     <!-- Modal -->
     @include('partials.task-modal')
 </div>
+
+@push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const lists = document.querySelectorAll('.sortable-list');
+    lists.forEach(list => {
+        new Sortable(list, {
+            group: 'shared', // set both lists to same group
+            animation: 150,
+            ghostClass: 'opacity-50', // Class name for the drop placeholder
+            onEnd: function (evt) {
+                const itemEl = evt.item;  // dragged HTMLElement
+                const newStatusId = evt.to.getAttribute('data-status-id'); // new list
+                
+                const taskId = itemEl.getAttribute('data-id');
+                
+                // Get the element before the dropped element
+                const prevEl = itemEl.previousElementSibling;
+                const prevTaskId = (prevEl && prevEl.getAttribute('data-id')) ? prevEl.getAttribute('data-id') : null;
+                
+                // Get the element after the dropped element
+                const nextEl = itemEl.nextElementSibling;
+                const nextTaskId = (nextEl && nextEl.getAttribute('data-id')) ? nextEl.getAttribute('data-id') : null;
+
+                // Send to backend
+                fetch('{{ route('tasks.reorder') }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    body: JSON.stringify({
+                        task_id: taskId,
+                        status_id: newStatusId,
+                        previous_task_id: prevTaskId,
+                        next_task_id: nextTaskId
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if(!data.success) {
+                        console.error('Error reordering tasks');
+                    } else {
+                        // Update UI if the status changed
+                        if (evt.from !== evt.to) {
+                            const newStatusName = evt.to.closest('.rounded-xl').querySelector('h3 span:last-child').innerText;
+                            const statusBadge = itemEl.querySelector('.task-status-badge');
+                            if (statusBadge) {
+                                statusBadge.innerText = newStatusName;
+                            }
+                            
+                            const oldBadgeCount = evt.from.closest('.rounded-xl').querySelector('.column-task-count');
+                            const newBadgeCount = evt.to.closest('.rounded-xl').querySelector('.column-task-count');
+                            if (oldBadgeCount && newBadgeCount) {
+                                oldBadgeCount.innerText = parseInt(oldBadgeCount.innerText) - 1;
+                                newBadgeCount.innerText = parseInt(newBadgeCount.innerText) + 1;
+                            }
+                            
+                            // Update the underlying task payload for the modal
+                            try {
+                                const taskData = JSON.parse(itemEl.dataset.task);
+                                taskData.status_id = parseInt(newStatusId);
+                                itemEl.dataset.task = JSON.stringify(taskData);
+                            } catch (e) {
+                                console.error('Error parsing task dataset', e);
+                            }
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+            },
+        });
+    });
+});
+</script>
+@endpush
 @endsection
