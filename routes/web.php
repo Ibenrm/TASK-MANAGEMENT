@@ -20,5 +20,6 @@ Route::post('/tugas', [TaskController::class, 'store'])->middleware('auth')->nam
 Route::put('/tugas/{task}', [TaskController::class, 'update'])->middleware('auth')->name('tasks.update');
 Route::post('/tugas/reorder', [TaskController::class, 'reorder'])->middleware('auth')->name('tasks.reorder');
 Route::get('/activity-history', function () {
-    return view('activities');
+    $logs = \App\Models\ActivityLog::with(['user', 'task'])->orderBy('created_at', 'desc')->paginate(30);
+    return view('activities', compact('logs'));
 })->middleware('auth')->name('activity.history');

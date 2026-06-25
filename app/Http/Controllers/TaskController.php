@@ -6,6 +6,7 @@ use App\Models\StatusNode;
 use App\Models\Priority;
 use App\Models\User;
 use App\Models\Task;
+use App\Models\ActivityLog;
 use Illuminate\Http\Request;
 
 class TaskController extends Controller
@@ -95,6 +96,13 @@ class TaskController extends Controller
             }
         }
 
+        ActivityLog::create([
+            'user_id' => auth()->id() ?? 1,
+            'task_id' => $task->id,
+            'action' => 'created',
+            'description' => "Membuat tugas baru: {$task->title}",
+        ]);
+
         return redirect()->route('tugas')->with('success', 'Task berhasil dibuat!');
     }
 
@@ -158,6 +166,13 @@ class TaskController extends Controller
             ]);
         }
 
+        ActivityLog::create([
+            'user_id' => auth()->id() ?? 1,
+            'task_id' => $task->id,
+            'action' => 'updated',
+            'description' => "Memperbarui tugas: {$task->title}",
+        ]);
+
         return redirect()->route('tugas')->with('success', 'Task berhasil diperbarui!');
     }
 
@@ -202,6 +217,19 @@ class TaskController extends Controller
         }
         if ($newNextId) {
             Task::where('id', $newNextId)->update(['previous_task_id' => $task->id]);
+        }
+
+        if ($task->status_id != $request->status_id) {
+            $oldStatusNode = StatusNode::find($task->status_id);
+            $newStatusNode = StatusNode::find($request->status_id);
+            if ($oldStatusNode && $newStatusNode) {
+                ActivityLog::create([
+                    'user_id' => auth()->id() ?? 1,
+                    'task_id' => $task->id,
+                    'action' => 'moved',
+                    'description' => "Memindahkan tugas '{$task->title}' dari {$oldStatusNode->name} ke {$newStatusNode->name}",
+                ]);
+            }
         }
 
         return response()->json(['success' => true]);

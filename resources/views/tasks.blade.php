@@ -67,9 +67,10 @@
                     <!-- Dynamic Dot Color based on Status -->
                     @php
                         $dotColor = 'background-color: #94a3b8;'; // default gray
-                        if($status->slug == 'to_do') $dotColor = 'background-color: #cbd5e1;'; // Slate 300
-                        if($status->slug == 'in_progress') $dotColor = 'background-color: #6366f1;'; // Indigo 500
-                        if($status->slug == 'done') $dotColor = 'background-color: #10b981;'; // Emerald 500
+                        $badgeTheme = 'slate';
+                        if($status->slug == 'to_do') { $dotColor = 'background-color: #ef4444;'; $badgeTheme = 'red'; }
+                        if($status->slug == 'in_progress') { $dotColor = 'background-color: #eab308;'; $badgeTheme = 'yellow'; }
+                        if($status->slug == 'done') { $dotColor = 'background-color: #10b981;'; $badgeTheme = 'emerald'; }
                     @endphp
                     <span class="w-2.5 h-2.5 rounded-full" style="{{ $dotColor }}"></span>
                     <span>{{ $status->name }}</span>
@@ -80,7 +81,7 @@
             </div>
 
             <!-- Task List -->
-            <div class="p-3 flex-1 overflow-y-auto space-y-3 sortable-list" data-status-id="{{ $status->id }}">
+            <div class="p-3 flex-1 overflow-y-auto space-y-3 sortable-list" data-status-id="{{ $status->id }}" data-theme="{{ $badgeTheme }}">
                 @foreach($status->tasks as $task)
                 <!-- Task Card -->
                 <div data-id="{{ $task->id }}" data-task="{{ $task->toJson() }}" @click="showModal = true; $dispatch('modal-opened', { task: JSON.parse($el.dataset.task) })" class="bg-white dark:bg-slate-800 p-3.5 rounded-xl shadow-sm hover:shadow-md cursor-pointer group kanban-card transition-all duration-200 border border-slate-200 dark:border-slate-700 relative flex flex-col gap-3">
@@ -101,7 +102,10 @@
                             </span>
                             
                             <!-- Status Badge -->
-                            <span class="task-status-badge inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-slate-50 text-slate-500 border border-slate-200 dark:bg-slate-700/50 dark:text-slate-400 dark:border-slate-600">
+                            @php
+                                $sClass = "bg-{$badgeTheme}-50 text-{$badgeTheme}-600 border-{$badgeTheme}-200 dark:bg-{$badgeTheme}-500/10 dark:text-{$badgeTheme}-400 dark:border-{$badgeTheme}-500/20";
+                            @endphp
+                            <span class="task-status-badge inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide border {{ $sClass }}" data-current-theme="{{ $badgeTheme }}">
                                 {{ $status->name }}
                             </span>
                         </div>
@@ -269,9 +273,24 @@ document.addEventListener('DOMContentLoaded', function () {
                         // Update UI if the status changed
                         if (evt.from !== evt.to) {
                             const newStatusName = evt.to.closest('.rounded-xl').querySelector('h3 span:last-child').innerText;
+                            const newTheme = evt.to.getAttribute('data-theme');
                             const statusBadge = itemEl.querySelector('.task-status-badge');
+                            
                             if (statusBadge) {
                                 statusBadge.innerText = newStatusName;
+                                const oldTheme = statusBadge.getAttribute('data-current-theme');
+                                
+                                // Remove old theme classes
+                                statusBadge.classList.remove(`bg-${oldTheme}-50`, `text-${oldTheme}-600`, `border-${oldTheme}-200`);
+                                statusBadge.className = statusBadge.className.replace(new RegExp(`dark:bg-${oldTheme}-500/10`, 'g'), '');
+                                statusBadge.className = statusBadge.className.replace(new RegExp(`dark:text-${oldTheme}-400`, 'g'), '');
+                                statusBadge.className = statusBadge.className.replace(new RegExp(`dark:border-${oldTheme}-500/20`, 'g'), '');
+                                
+                                // Add new theme classes
+                                statusBadge.classList.add(`bg-${newTheme}-50`, `text-${newTheme}-600`, `border-${newTheme}-200`);
+                                statusBadge.className += ` dark:bg-${newTheme}-500/10 dark:text-${newTheme}-400 dark:border-${newTheme}-500/20`;
+                                
+                                statusBadge.setAttribute('data-current-theme', newTheme);
                             }
                             
                             const oldBadgeCount = evt.from.closest('.rounded-xl').querySelector('.column-task-count');

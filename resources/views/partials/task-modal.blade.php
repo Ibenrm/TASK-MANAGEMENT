@@ -552,10 +552,44 @@
                 <p class="tm-section-label">To-Do List (Sub-Tugas)</p>
                 <div class="space-y-2 mb-4">
                     <template x-for="(todo, index) in todos" :key="index">
-                        <div class="flex items-center gap-2 group">
-                            <input type="checkbox" x-model="todo.is_checked" class="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer">
-                            <input type="text" x-model="todo.todo_text" class="tm-input flex-1 py-1.5 px-3 text-sm" placeholder="Nama sub-tugas">
-                            <button type="button" @click="removeTodo(index)" class="text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity" title="Hapus sub-tugas">
+                        <div class="flex items-center gap-3 group py-1">
+                            <!-- Enforce Stack/Sequential Order for checking -->
+                            <label class="relative flex items-center justify-center shrink-0" 
+                                   :class="(index > 0 && !todos[index-1].is_checked) || (index < todos.length - 1 && todos[index+1].is_checked) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-110 transition-transform'"
+                                   title="Harus diselesaikan berurutan">
+                                
+                                <input type="checkbox" x-model="todo.is_checked" 
+                                       :disabled="(index > 0 && !todos[index-1].is_checked) || (index < todos.length - 1 && todos[index+1].is_checked)"
+                                       class="absolute opacity-0 w-0 h-0 peer">
+                                
+                                <!-- Custom Checkbox Visuals (Light & Dark Mode Support) -->
+                                <div class="w-5 h-5 rounded border-2 flex items-center justify-center transition-all duration-300 shadow-sm relative
+                                            border-slate-300 bg-white
+                                            peer-checked:bg-indigo-500 peer-checked:border-indigo-500 peer-checked:text-white
+                                            peer-focus-visible:ring-2 peer-focus-visible:ring-indigo-500 peer-focus-visible:ring-offset-2
+                                            dark:border-slate-600 dark:bg-slate-800 dark:peer-checked:bg-indigo-500 dark:peer-checked:border-indigo-500"
+                                     :class="(index > 0 && !todos[index-1].is_checked) ? 'bg-slate-100 text-slate-400 dark:bg-slate-700 dark:text-slate-500' : 'text-transparent'">
+                                    
+                                    <!-- Checkmark (shown when checked) -->
+                                    <svg class="w-3.5 h-3.5 absolute transform transition-transform duration-300 peer-checked:scale-100 scale-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path>
+                                    </svg>
+                                    
+                                    <!-- Cross X (shown when locked/previous unchecked) -->
+                                    <svg x-show="index > 0 && !todos[index-1].is_checked" class="w-3 h-3 absolute" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"></path>
+                                    </svg>
+                                </div>
+                            </label>
+                            
+                            <input type="text" x-model="todo.todo_text" 
+                                   :class="[
+                                       (index > 0 && !todos[index-1].is_checked) ? 'text-slate-400 dark:text-slate-600' : 'text-slate-700 dark:text-slate-200',
+                                       todo.is_checked ? 'line-through text-slate-400 dark:text-slate-500' : ''
+                                   ]"
+                                   class="tm-input flex-1 py-1.5 px-3 text-sm transition-all duration-200 bg-transparent border-transparent hover:border-slate-200 focus:border-indigo-300 dark:hover:border-slate-700 dark:focus:border-indigo-500" placeholder="Nama sub-tugas">
+                            
+                            <button type="button" @click="removeTodo(index)" class="text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1" title="Hapus sub-tugas">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                             </button>
                         </div>
