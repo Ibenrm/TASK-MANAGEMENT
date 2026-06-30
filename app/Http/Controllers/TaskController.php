@@ -133,6 +133,7 @@ class TaskController extends Controller
         if ($request->has('todos_json')) {
             $todos = json_decode($request->todos_json, true);
             if (is_array($todos)) {
+                $keptIds = [];
                 foreach ($todos as $index => $todo) {
                     if (trim($todo['todo_text'] ?? '') !== '') {
                         if (isset($todo['id'])) {
@@ -143,18 +144,19 @@ class TaskController extends Controller
                                     'is_checked' => filter_var($todo['is_checked'] ?? false, FILTER_VALIDATE_BOOLEAN),
                                     'position' => $index,
                                 ]);
+                                $keptIds[] = $existingTodo->id;
                             }
                         } else {
-                            $task->todos()->create([
+                            $newTodo = $task->todos()->create([
                                 'todo_text' => trim($todo['todo_text']),
                                 'is_checked' => filter_var($todo['is_checked'] ?? false, FILTER_VALIDATE_BOOLEAN),
                                 'position' => $index,
                             ]);
+                            $keptIds[] = $newTodo->id;
                         }
                     }
                 }
                 
-                $keptIds = array_filter(array_column($todos, 'id'));
                 $task->todos()->whereNotIn('id', $keptIds)->delete();
             }
         }
