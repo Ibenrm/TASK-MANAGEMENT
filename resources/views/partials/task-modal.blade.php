@@ -360,12 +360,23 @@
         comments: [],
         newTodo: '',
         
+        get uncompletedTodos() {
+            return this.todos.filter(t => !t.is_checked);
+        },
+        
+        get completedTodos() {
+            return this.todos.filter(t => t.is_checked);
+        },
+        
         initModal(e) {
             const data = e.detail.task;
             if (data) {
                 this.editMode = true;
                 this.task = data;
-                this.todos = data.todos ? JSON.parse(JSON.stringify(data.todos)) : []; // Deep copy
+                this.todos = (data.todos ? JSON.parse(JSON.stringify(data.todos)) : []).map(t => ({
+                    ...t,
+                    _id: t._id || Date.now() + '-' + Math.random().toString(36).substr(2, 9)
+                }));
                 this.comments = data.comments || [];
                 this.activeTab = 'detail';
                 setTimeout(() => {
@@ -395,13 +406,20 @@
         
         addTodo() {
             if (this.newTodo.trim() !== '') {
-                this.todos.push({ todo_text: this.newTodo, is_checked: false });
+                this.todos.push({ 
+                    _id: Date.now() + '-' + Math.random().toString(36).substr(2, 9), 
+                    todo_text: this.newTodo, 
+                    is_checked: false 
+                });
                 this.newTodo = '';
             }
         },
         
-        removeTodo(index) {
-            this.todos.splice(index, 1);
+        removeTodo(todoId) {
+            const index = this.todos.findIndex(t => t._id === todoId);
+            if (index > -1) {
+                this.todos.splice(index, 1);
+            }
         }
      }"
      @modal-opened.window="initModal($event)"
@@ -441,12 +459,12 @@
         </div>
 
         {{-- Form --}}
-        <form :action="editMode ? '/tugas/' + task.id : '{{ route('tasks.store') }}'" method="POST" class="tm-body" id="task-form">
+        <form :action="editMode ? '/tugas/' + task.id : '{{ route('tasks.store') }}'" method="POST" class="tm-body" id="task-form" @submit="document.getElementById('todos_json_input').value = JSON.stringify(todos)">
             @csrf
             <template x-if="editMode">
                 <input type="hidden" name="_method" value="PUT">
             </template>
-            <input type="hidden" name="todos_json" :value="JSON.stringify(todos)">
+            <input type="hidden" name="todos_json" id="todos_json_input" :value="JSON.stringify(todos)">
 
             {{-- Form fields will go below --}}
 
@@ -549,54 +567,84 @@
 
                 {{-- To-Do List Section --}}
                 <hr class="tm-sep">
-                <p class="tm-section-label">To-Do List (Sub-Tugas)</p>
-                <div class="space-y-2 mb-4">
-                    <template x-for="(todo, index) in todos" :key="index">
-                        <div class="flex items-center gap-3 group py-1">
-                            <!-- Enforce Stack/Sequential Order for checking -->
-                            <label class="relative flex items-center justify-center shrink-0" 
-                                   :class="(index > 0 && !todos[index-1].is_checked) || (index < todos.length - 1 && todos[index+1].is_checked) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-110 transition-transform'"
-                                   title="Harus diselesaikan berurutan">
-                                
-                                <input type="checkbox" x-model="todo.is_checked" 
-                                       :disabled="(index > 0 && !todos[index-1].is_checked) || (index < todos.length - 1 && todos[index+1].is_checked)"
-                                       class="absolute opacity-0 w-0 h-0 peer">
-                                
-                                <!-- Custom Checkbox Visuals (Light & Dark Mode Support) -->
-                                <div class="w-5 h-5 rounded border-2 flex items-center justify-center transition-all duration-300 shadow-sm relative
-                                            border-slate-300 bg-white
-                                            peer-checked:bg-indigo-500 peer-checked:border-indigo-500 peer-checked:text-white
-                                            peer-focus-visible:ring-2 peer-focus-visible:ring-indigo-500 peer-focus-visible:ring-offset-2
-                                            dark:border-slate-600 dark:bg-slate-800 dark:peer-checked:bg-indigo-500 dark:peer-checked:border-indigo-500"
-                                     :class="(index > 0 && !todos[index-1].is_checked) ? 'bg-slate-100 text-slate-400 dark:bg-slate-700 dark:text-slate-500' : 'text-transparent'">
+                <p class="tm-section-label">To-Do List (Sub-Tugas) - Stack Mode</p>
+                <div class="space-y-4 mb-4">
+                    
+                    {{-- Uncompleted Tasks (Belum Selesai) --}}
+                    <div class="space-y-2">
+                        <template x-if="uncompletedTodos.length > 0">
+                            <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Belum Selesai</p>
+                        </template>
+                        <template x-for="(todo, idx) in uncompletedTodos" :key="todo._id">
+                            <div class="flex items-center gap-3 group py-1">
+                                <!-- Free selection for checking -->
+                                <label class="relative flex items-center justify-center shrink-0 cursor-pointer hover:scale-110 transition-transform" 
+                                       title="Klik untuk menyelesaikan sub-tugas">
                                     
-                                    <!-- Checkmark (shown when checked) -->
-                                    <svg class="w-3.5 h-3.5 absolute transform transition-transform duration-300 peer-checked:scale-100 scale-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path>
-                                    </svg>
+                                    <input type="checkbox" x-model="todo.is_checked" 
+                                           class="absolute opacity-0 w-0 h-0 peer">
                                     
-                                    <!-- Cross X (shown when locked/previous unchecked) -->
-                                    <svg x-show="index > 0 && !todos[index-1].is_checked" class="w-3 h-3 absolute" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"></path>
-                                    </svg>
-                                </div>
-                            </label>
-                            
-                            <input type="text" x-model="todo.todo_text" 
-                                   :class="[
-                                       (index > 0 && !todos[index-1].is_checked) ? 'text-slate-400 dark:text-slate-600' : 'text-slate-700 dark:text-slate-200',
-                                       todo.is_checked ? 'line-through text-slate-400 dark:text-slate-500' : ''
-                                   ]"
-                                   class="tm-input flex-1 py-1.5 px-3 text-sm transition-all duration-200 bg-transparent border-transparent hover:border-slate-200 focus:border-indigo-300 dark:hover:border-slate-700 dark:focus:border-indigo-500" placeholder="Nama sub-tugas">
-                            
-                            <button type="button" @click="removeTodo(index)" class="text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1" title="Hapus sub-tugas">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                            </button>
-                        </div>
-                    </template>
-                    <div class="flex items-center gap-2 mt-2">
+                                    <!-- Custom Checkbox Visuals -->
+                                    <div class="w-5 h-5 rounded border-2 flex items-center justify-center transition-all duration-300 shadow-sm relative
+                                                border-slate-300 bg-white text-transparent
+                                                peer-focus-visible:ring-2 peer-focus-visible:ring-indigo-500 peer-focus-visible:ring-offset-2
+                                                dark:border-slate-600 dark:bg-slate-800">
+                                    </div>
+                                </label>
+                                
+                                <input type="text" x-model="todo.todo_text" 
+                                       class="text-slate-700 dark:text-slate-200 tm-input flex-1 py-1.5 px-3 text-sm transition-all duration-200 bg-transparent border-transparent hover:border-slate-200 focus:border-indigo-300 dark:hover:border-slate-700 dark:focus:border-indigo-500" placeholder="Nama sub-tugas">
+                                
+                                <button type="button" @click="removeTodo(todo._id)" class="text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1" title="Hapus sub-tugas">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                </button>
+                            </div>
+                        </template>
+                        <template x-if="uncompletedTodos.length === 0 && completedTodos.length === 0">
+                            <p class="text-xs text-slate-400 italic">Belum ada sub-tugas.</p>
+                        </template>
+                    </div>
+
+                    {{-- Completed Tasks (Selesai) --}}
+                    <div class="space-y-2 mt-2 pt-2 border-t border-slate-100 dark:border-slate-700" x-show="completedTodos.length > 0">
+                        <p class="text-[11px] font-semibold text-emerald-500 uppercase tracking-wide">Selesai</p>
+                        <template x-for="(todo, idx) in completedTodos" :key="todo._id">
+                            <div class="flex items-center gap-3 group py-1">
+                                <label class="relative flex items-center justify-center shrink-0" 
+                                       :class="idx < completedTodos.length - 1 ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-110 transition-transform'"
+                                       title="Hanya sub-tugas terakhir yang dapat dibatalkan (Stack)">
+                                    
+                                    <input type="checkbox" x-model="todo.is_checked" 
+                                           :disabled="idx < completedTodos.length - 1"
+                                           class="absolute opacity-0 w-0 h-0 peer">
+                                    
+                                    <div class="w-5 h-5 rounded border-2 flex items-center justify-center transition-all duration-300 shadow-sm relative
+                                                border-emerald-500 bg-emerald-500 text-white
+                                                peer-focus-visible:ring-2 peer-focus-visible:ring-emerald-500 peer-focus-visible:ring-offset-2
+                                                dark:border-emerald-500 dark:bg-emerald-500"
+                                         :class="idx < completedTodos.length - 1 ? 'opacity-60' : ''">
+                                        
+                                        <!-- Checkmark -->
+                                        <svg class="w-3.5 h-3.5 absolute" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path>
+                                        </svg>
+                                    </div>
+                                </label>
+                                
+                                <input type="text" x-model="todo.todo_text" 
+                                       class="tm-input flex-1 py-1.5 px-3 text-sm line-through text-slate-400 dark:text-slate-500 bg-transparent border-transparent" readonly>
+                                
+                                <button type="button" @click="removeTodo(todo._id)" class="text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1" title="Hapus sub-tugas">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                </button>
+                            </div>
+                        </template>
+                    </div>
+
+                    {{-- Input New Todo --}}
+                    <div class="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
                         <input type="text" x-model="newTodo" @keydown.enter.prevent="addTodo()" class="tm-input flex-1 py-1.5 px-3 text-sm" placeholder="Tambah sub-tugas baru... (tekan enter)">
-                        <button type="button" @click="addTodo()" class="px-3 py-1.5 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded hover:bg-slate-200 dark:hover:bg-slate-600 font-medium text-xs transition-colors">Tambah</button>
+                        <button type="button" @click="addTodo()" class="px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 rounded hover:bg-indigo-100 dark:hover:bg-indigo-900/60 font-semibold text-xs transition-colors border border-indigo-200 dark:border-indigo-800">Tambah</button>
                     </div>
                 </div>
 
@@ -655,7 +703,7 @@
                     <h3 class="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider mb-4">Riwayat Penyelesaian Sub-Tugas</h3>
                     
                     <div class="space-y-4">
-                        <template x-for="todo in todos.filter(t => t.is_checked).sort((a,b) => new Date(b.updated_at || Date.now()) - new Date(a.updated_at || Date.now()))" :key="todo.id || todo.todo_text">
+                        <template x-for="todo in todos.filter(t => t.is_checked).sort((a,b) => new Date(b.updated_at || Date.now()) - new Date(a.updated_at || Date.now()))" :key="todo._id || todo.id || todo.todo_text">
                             <div class="flex items-start gap-3">
                                 <div class="w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5">
                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
